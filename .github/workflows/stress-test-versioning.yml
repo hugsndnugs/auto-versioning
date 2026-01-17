@@ -1,0 +1,57 @@
+name: Stress Test Version Bumps
+
+on:
+  schedule:
+    - cron: '0 2 * * *'  # Daily at 2 AM UTC
+  workflow_dispatch:  # Manual trigger
+
+permissions:
+  contents: write  # Required to create branches and commits
+
+jobs:
+  stress-test:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch full history
+          token: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      
+      - name: Install auto-versioning
+        run: |
+          pip install -e .
+      
+      - name: Configure Git
+        run: |
+          git config --global user.email "action@github.com"
+          git config --global user.name "GitHub Action"
+      
+      - name: Run stress tests
+        id: stress_test
+        run: |
+          python scripts/stress_test_versioning.py
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Report test results
+        if: always()
+        run: |
+          if [ -f stress_test_results.txt ]; then
+            echo "## Stress Test Results" >> $GITHUB_STEP_SUMMARY
+            cat stress_test_results.txt >> $GITHUB_STEP_SUMMARY
+            cat stress_test_results.txt
+          fi
+      
+      - name: Check test status
+        if: steps.stress_test.outcome == 'failure'
+        run: |
+          echo "Stress tests failed. Check the test results above for details."
+          exit 1
