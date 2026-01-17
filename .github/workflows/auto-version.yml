@@ -1,0 +1,55 @@
+name: Auto Version Numbering
+
+on:
+  push:
+    branches:
+      - '**'  # Trigger on all branches
+
+permissions:
+  contents: write  # Required to push commits back
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch full history to access commit messages
+          token: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      
+      - name: Run version manager
+        id: version_manager
+        run: |
+          python scripts/version_manager.py
+        continue-on-error: true
+      
+      - name: Check if version file changed
+        id: check_changes
+        run: |
+          if git diff --quiet __version__.py; then
+            echo "changed=false" >> $GITHUB_OUTPUT
+            echo "No version changes detected"
+          else
+            echo "changed=true" >> $GITHUB_OUTPUT
+            echo "Version file has been updated"
+            git diff __version__.py
+          fi
+        continue-on-error: true
+      
+      - name: Commit and push version update
+        if: steps.check_changes.outputs.changed == 'true'
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add __version__.py
+          git commit -m "chore: auto-increment version [skip ci]" || exit 0
+          git push
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
