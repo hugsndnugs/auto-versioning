@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "auto-versioning"
+version = "0.0.3"
+description = "Automatic semantic versioning for Python projects based on commit messages"
+readme = "README.md"
+requires-python = ">=3.7"
+license = {text = "MIT"}
+authors = [
+    {name = "Auto Versioning Contributors"}
+]
+keywords = ["versioning", "semantic-versioning", "git", "automation", "ci-cd"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.7",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Version Control",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+
+[project.scripts]
+version-manager = "auto_versioning.version_manager:main"
+auto-version-setup = "auto_versioning.setup_tool:main"
+
+[tool.setuptools]
+packages = ["auto_versioning"]
+
+[tool.setuptools.package-data]
+auto_versioning = ["templates/*.yml"]

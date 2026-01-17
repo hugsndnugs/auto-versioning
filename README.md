@@ -1,6 +1,6 @@
-# Auto Version Numbering via GitHub Actions
+# Auto Version Numbering
 
-Automatically increment semantic version numbers (MAJOR.MINOR.PATCH) on every commit using GitHub Actions. This workflow detects version increment markers in commit messages and updates a Python version file accordingly.
+Automatically increment semantic version numbers (MAJOR.MINOR.PATCH) on every commit using GitHub Actions. This package provides a pip-installable tool that detects version increment markers in commit messages and updates a Python version file accordingly.
 
 ## Features
 
@@ -9,6 +9,7 @@ Automatically increment semantic version numbers (MAJOR.MINOR.PATCH) on every co
 - ✅ **Commit message based** - Control version increments via commit messages
 - ✅ **All branches** - Works on every branch automatically
 - ✅ **Python integration** - Updates `__version__.py` file for easy import
+- ✅ **Easy installation** - Install via pip and set up with a single command
 
 ## How It Works
 
@@ -20,34 +21,87 @@ The workflow runs automatically on every push to any branch:
 4. Updates `__version__.py` with the new version
 5. Commits and pushes the version update back to the repository
 
-## Setup
+## Quick Start
+
+### Installation
+
+Install the package via pip:
+
+```bash
+pip install auto-versioning
+```
+
+### Setup in Your Repository
+
+Run the setup command in your repository root:
+
+```bash
+auto-version-setup
+```
+
+This will:
+- Install the GitHub Actions workflow to `.github/workflows/auto-version.yml`
+- Create an initial `__version__.py` file (if it doesn't exist) with version `0.0.0`
+
+### Commit and Push
+
+```bash
+git add .github/workflows/auto-version.yml __version__.py
+git commit -m "Add auto-versioning setup [patch]"
+git push
+```
+
+The workflow will automatically run on every push and increment versions based on commit messages.
+
+## Setup (Detailed)
 
 ### Prerequisites
 
 - A GitHub repository
-- Python 3.x (used by the workflow)
+- Python 3.7+ (used by the workflow)
 
-### Installation
+### Installation Options
 
-1. **Clone or initialize your repository**
+#### Option 1: Install from PyPI (Recommended)
+
+```bash
+pip install auto-versioning
+```
+
+#### Option 2: Install from Source
+
+```bash
+git clone <this-repo-url>
+cd auto-versioning
+pip install -e .
+```
+
+### Manual Setup
+
+If you prefer to set up manually:
+
+1. **Install the package**
    ```bash
-   git clone <your-repo-url>
-   cd <your-repo-name>
+   pip install auto-versioning
    ```
 
-2. **Ensure the required files exist**
-   - `__version__.py` - Version file (created automatically if missing, starts at `0.0.0`)
-   - `scripts/version_manager.py` - Version management script
-   - `.github/workflows/auto-version.yml` - GitHub Actions workflow
+2. **Create the workflow file**
+   - Copy the workflow template from the package or create `.github/workflows/auto-version.yml`
+   - The workflow should use the `version-manager` command (installed via pip)
 
-3. **Push to GitHub**
+3. **Create version file** (if it doesn't exist)
    ```bash
-   git add .
+   echo '__version__ = "0.0.0"' > __version__.py
+   ```
+
+4. **Push to GitHub**
+   ```bash
+   git add .github/workflows/auto-version.yml __version__.py
    git commit -m "Add auto-versioning workflow [patch]"
    git push
    ```
 
-4. **Verify workflow runs**
+5. **Verify workflow runs**
    - Go to your repository on GitHub
    - Navigate to the "Actions" tab
    - You should see the "Auto Version Numbering" workflow running
@@ -159,7 +213,13 @@ By default, the workflow looks for `__version__.py` in the repository root. To u
   env:
     VERSION_FILE: 'src/__version__.py'
   run: |
-    python scripts/version_manager.py
+    version-manager
+```
+
+You can also set it when running locally:
+
+```bash
+VERSION_FILE=src/__version__.py version-manager
 ```
 
 ### Workflow Permissions
@@ -201,18 +261,31 @@ on:
 
 ### Manual Execution
 
-You can also run the version manager script locally:
+You can also run the version manager command locally:
 
 ```bash
-python scripts/version_manager.py
+version-manager
 ```
 
-The script will:
-- Read the current version from `__version__.py`
+Or if you have the package installed in development mode:
+
+```bash
+python -m auto_versioning.version_manager
+```
+
+The command will:
+- Read the current version from `__version__.py` (or path specified by `VERSION_FILE` env var)
 - Get the latest commit message
 - Determine the increment type
 - Update the version file
 - Exit with code 0 if version changed, 1 if unchanged
+
+### CLI Commands
+
+After installation, two commands are available:
+
+- **`version-manager`** - Runs the version increment logic
+- **`auto-version-setup`** - Sets up the tool in your repository (installs workflow and creates version file)
 
 ## Troubleshooting
 
@@ -261,15 +334,26 @@ The script will:
 
 ## File Structure
 
+After installation and setup, your repository will have:
+
 ```
 .
 ├── __version__.py                 # Version file (created/updated automatically)
-├── scripts/
-│   └── version_manager.py        # Version management script
 ├── .github/
 │   └── workflows/
 │       └── auto-version.yml      # GitHub Actions workflow
-└── README.md                      # This file
+└── README.md                      # Your project README
+```
+
+The package itself (when installed) provides:
+
+```
+auto_versioning/
+├── __init__.py
+├── version_manager.py            # Version management logic
+├── setup_tool.py                 # Setup command implementation
+└── templates/
+    └── auto-version.yml         # Workflow template
 ```
 
 ## Version Increment Rules

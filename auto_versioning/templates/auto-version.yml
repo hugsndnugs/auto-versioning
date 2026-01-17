@@ -1,0 +1,66 @@
+name: Auto Version Numbering
+
+on:
+  push:
+    branches:
+      - '**'  # Trigger on all branches
+
+permissions:
+  contents: write  # Required to push commits back
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch full history to access commit messages
+          token: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      
+      - name: Install auto-versioning
+        run: |
+          pip install auto-versioning
+      
+      - name: Run version manager
+        id: version_manager
+        run: |
+          version-manager
+        continue-on-error: true
+        env:
+          VERSION_FILE: ${{ env.VERSION_FILE }}
+      
+      - name: Check if version file changed
+        id: check_changes
+        run: |
+          VERSION_FILE="${VERSION_FILE:-__version__.py}"
+          if git diff --quiet "$VERSION_FILE"; then
+            echo "changed=false" >> $GITHUB_OUTPUT
+            echo "No version changes detected"
+          else
+            echo "changed=true" >> $GITHUB_OUTPUT
+            echo "Version file has been updated"
+            git diff "$VERSION_FILE"
+          fi
+        continue-on-error: true
+        env:
+          VERSION_FILE: ${{ env.VERSION_FILE }}
+      
+      - name: Commit and push version update
+        if: steps.check_changes.outputs.changed == 'true'
+        run: |
+          VERSION_FILE="${VERSION_FILE:-__version__.py}"
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add "$VERSION_FILE"
+          git commit -m "chore: auto-increment version [skip ci]" || exit 0
+          git push
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION_FILE: ${{ env.VERSION_FILE }}
