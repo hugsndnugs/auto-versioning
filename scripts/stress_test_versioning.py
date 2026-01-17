@@ -13,6 +13,8 @@ import re
 import subprocess
 import sys
 import os
+import time
+import random
 from pathlib import Path
 from datetime import datetime
 from typing import Tuple, Optional
@@ -85,20 +87,64 @@ class VersionStressTester:
             print(f"Error setting version: {e}")
             return False
     
-    def make_commit(self, message: str, file_content: str = "test") -> bool:
+    def make_commit(self, message: str, file_content: str = None) -> bool:
         """Make a test commit with the given message."""
-        # Create or update a test file
+        # Create or update a test file with unique content
         test_file = Path("stress_test_file.txt")
-        with open(test_file, 'w') as f:
-            f.write(f"{file_content}\n")
+        if file_content is None:
+            # Generate unique content using timestamp and random to ensure it's always different
+            file_content = f"test content {time.time()} {random.random()}\n"
         
-        # Stage and commit
-        self.run_command(['git', 'add', str(test_file)])
-        returncode, _, _ = self.run_command(
+        # Always write the content (it should be unique each time)
+        with open(test_file, 'w') as f:
+            f.write(file_content)
+        
+        # Check if file is tracked
+        returncode, stdout, stderr = self.run_command(['git', 'ls-files', '--error-unmatch', str(test_file)], check=False)
+        file_is_tracked = returncode == 0
+        
+        # Stage the file (add if not tracked, or if tracked and modified)
+        returncode, stdout, stderr = self.run_command(['git', 'add', str(test_file)], check=False)
+        if returncode != 0:
+            print(f"Error staging file: {stderr}")
+            return False
+        
+        # Check if there are changes to commit
+        returncode, stdout, stderr = self.run_command(['git', 'diff', '--cached', '--quiet'], check=False)
+        if returncode == 0:
+            # No changes staged - this means the file content is identical to what's already committed
+            # This shouldn't happen with unique timestamps, but let's handle it
+            print(f"Warning: No changes detected for commit '{message}'")
+            # Try to see what's happening
+            returncode2, stdout2, stderr2 = self.run_command(['git', 'status', '--short'], check=False)
+            print(f"Git status: {stdout2}")
+            # Force a change by appending to the file
+            with open(test_file, 'a') as f:
+                f.write(f"# Additional change at {time.time()}\n")
+            self.run_command(['git', 'add', str(test_file)], check=False)
+        
+        # Commit
+        returncode, stdout, stderr = self.run_command(
             ['git', 'commit', '-m', message],
             check=False
         )
-        return returncode == 0
+        
+        if returncode != 0:
+            error_msg = (stderr or stdout).lower()
+            # Check if it's just "nothing to commit"
+            if "nothing to commit" in error_msg or "nothing added to commit" in error_msg:
+                print(f"Error: Nothing to commit for '{message}' - {stderr or stdout}")
+                # Show more debug info
+                returncode2, stdout2, stderr2 = self.run_command(['git', 'status'], check=False)
+                print(f"Git status:\n{stdout2}")
+                returncode3, stdout3, stderr3 = self.run_command(['git', 'diff', '--cached'], check=False)
+                print(f"Staged changes:\n{stdout3}")
+                return False
+            else:
+                print(f"Error committing '{message}': {stderr or stdout}")
+                return False
+        
+        return True
     
     def run_version_manager(self) -> bool:
         """Run the version-manager command."""
@@ -135,9 +181,13 @@ class VersionStressTester:
                 result.set_result(False, error="Failed to set initial version")
                 return result
             
-            # Commit the version file
-            self.run_command(['git', 'add', self.version_file])
-            self.run_command(['git', 'commit', '-m', f'Set version to {current_version} [skip ci]'], check=False)
+            # Commit the version file (only if it changed)
+            self.run_command(['git', 'add', self.version_file], check=False)
+            returncode, stdout, stderr = self.run_command(
+                ['git', 'commit', '-m', f'Set version to {current_version} [skip ci]'],
+                check=False
+            )
+            # It's okay if commit fails due to no changes - version might already be set
             
             # Make test commit
             if not self.make_commit(commit_message):
@@ -149,7 +199,11 @@ class VersionStressTester:
             
             # Commit version file changes (if any)
             self.run_command(['git', 'add', self.version_file], check=False)
-            self.run_command(['git', 'commit', '-m', 'chore: auto-increment version [skip ci]'], check=False)
+            returncode, stdout, stderr = self.run_command(
+                ['git', 'commit', '-m', 'chore: auto-increment version [skip ci]'],
+                check=False
+            )
+            # It's okay if commit fails - version might not have changed
             
             # Read actual version
             actual_version = self.read_version()
@@ -278,7 +332,11 @@ class VersionStressTester:
                 
                 # Commit version file changes (if any)
                 self.run_command(['git', 'add', self.version_file], check=False)
-                self.run_command(['git', 'commit', '-m', 'chore: auto-increment version [skip ci]'], check=False)
+                returncode, stdout, stderr = self.run_command(
+                    ['git', 'commit', '-m', 'chore: auto-increment version [skip ci]'],
+                    check=False
+                )
+                # It's okay if commit fails - version might not have changed
                 
                 actual_version = self.read_version()
                 
@@ -346,7 +404,11 @@ class VersionStressTester:
             
             # Commit version file changes (if any)
             self.run_command(['git', 'add', self.version_file], check=False)
-            self.run_command(['git', 'commit', '-m', 'chore: auto-increment version [skip ci]'], check=False)
+            returncode, stdout, stderr = self.run_command(
+                ['git', 'commit', '-m', 'chore: auto-increment version [skip ci]'],
+                check=False
+            )
+            # It's okay if commit fails - version might not have changed
             
             # Check if file was created and version is correct
             if version_path.exists():
@@ -451,6 +513,13 @@ class VersionStressTester:
         print("=" * 60)
         print("Starting Version Bump Stress Tests")
         print("=" * 60)
+        
+        # Verify git is working
+        returncode, stdout, stderr = self.run_command(['git', 'status'], check=False)
+        if returncode != 0:
+            print(f"ERROR: Git is not working properly: {stderr}")
+            sys.exit(1)
+        print(f"Git status check passed")
         
         # Setup test branch
         if not self.setup_test_branch():
